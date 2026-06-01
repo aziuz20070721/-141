@@ -430,7 +430,16 @@ if (typeof window.Telegram !== 'undefined' && window.Telegram.WebApp) {
   }
 }
 
-const TODAY = '2026-06-01';
+// Get today's date in YYYY-MM-DD format
+function getTodayDate() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+const TODAY = getTodayDate();
 const TYPE_LABELS = { exam: 'ЭКЗАМЕН', consult: 'КОНСУЛЬТАЦИЯ', zachet: 'ЗАЧЁТ', retake: 'ПЕРЕСДАЧА', custom: 'МОЁ СОБЫТИЕ' };
 
 // ---- BUILT-IN EVENTS ----
@@ -445,7 +454,7 @@ const builtinEvents = [
   { date: '2026-06-09', type: 'exam',    subject: 'Информатика (устный опрос)',  note: '09:00 · ауд. 210/212 · Егамбердиев Б.Б., Киселёв Б.Г.' },
   { date: '2026-06-10', type: 'exam',    subject: 'Информатика',                 note: 'Экзамен · 09:00 · ауд. 210/212 · Егамбердиев Б.Б., Киселёв Б.Г.' },
   { date: '2026-06-11', type: 'consult', subject: 'Математический анализ',       note: 'Аттестация разделов, консультация · 09:00 · ауд. 102 · Бухарова Т.И.' },
-  { date: '2026-06-13', type: 'exam',    subject: 'Математический анализ',       note: 'Экзамен · 09:00 · ауд. 102 · Бухарова Т.И., Рахматуллин Р.З.' },
+  { date: '2026-06-13', type: 'exam',    subject: 'Математический анализ',       note: 'Экзамен · 09:00 · ауд. 102 · Бухарова Т.И., Рахматуллин А.Р.' },
   { date: '2026-06-15', type: 'consult', subject: 'Линейная алгебра',            note: 'Аттестация разделов, консультация · 09:00 · ауд. 102 · Бухарова Т.И.' },
   { date: '2026-06-17', type: 'exam',    subject: 'Линейная алгебра',            note: 'Экзамен · 09:00 · ауд. 102 · Бухарова Т.И., Шарипов А.А.' },
   { date: '2026-06-20', type: 'consult', subject: 'Общая физика (молек. физика)', note: 'Аттестация разделов, консультация · 09:00 · ауд. 102 · Загайнов В.А.' },
