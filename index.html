@@ -407,11 +407,19 @@
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
-// Инициализация Telegram Web App
-if (window.Telegram && window.Telegram.WebApp) {
-  const tg = window.Telegram.WebApp;
+// ===== TELEGRAM WEB APP INITIALIZATION =====
+let tg = null;
+let telegramReady = false;
+
+// Ждём полной инициализации Telegram API
+if (typeof window.Telegram !== 'undefined' && window.Telegram.WebApp) {
+  tg = window.Telegram.WebApp;
   tg.ready();
   tg.expand();
+  telegramReady = true;
+  
+  console.log('Telegram WebApp initialized');
+  console.log('CloudStorage available:', !!tg.CloudStorage);
   
   // Адаптация темы под Telegram
   if (tg.colorScheme === 'light') {
@@ -423,7 +431,6 @@ if (window.Telegram && window.Telegram.WebApp) {
 }
 
 const TODAY = '2026-06-01';
-
 const TYPE_LABELS = { exam: 'ЭКЗАМЕН', consult: 'КОНСУЛЬТАЦИЯ', zachet: 'ЗАЧЁТ', retake: 'ПЕРЕСДАЧА', custom: 'МОЁ СОБЫТИЕ' };
 
 // ---- BUILT-IN EVENTS ----
@@ -437,26 +444,134 @@ const builtinEvents = [
   { date: '2026-06-08', type: 'consult', subject: 'Информатика',                 note: 'Аттестация разделов, консультация · 09:00 · ауд. 102 · Егамбердиев Б.Б.' },
   { date: '2026-06-09', type: 'exam',    subject: 'Информатика (устный опрос)',  note: '09:00 · ауд. 210/212 · Егамбердиев Б.Б., Киселёв Б.Г.' },
   { date: '2026-06-10', type: 'exam',    subject: 'Информатика',                 note: 'Экзамен · 09:00 · ауд. 210/212 · Егамбердиев Б.Б., Киселёв Б.Г.' },
-  { date: '2026-06-11', type: 'consult', subject: 'Математический анализ',       note: 'Аттестация разделов, консультация · 09:00 · ауд. 102' },
-  { date: '2026-06-13', type: 'exam',    subject: 'Математический анализ',       note: 'Экзамен · 09:00 · ауд. 102 · Бухарова Т.И., Рахматуллаев А.М.' },
-  { date: '2026-06-15', type: 'consult', subject: 'Линейная алгебра',            note: 'Аттестация разделов, консультация · 09:00 · ауд. 102 · Шарипов А.А.' },
+  { date: '2026-06-11', type: 'consult', subject: 'Математический анализ',       note: 'Аттестация разделов, консультация · 09:00 · ауд. 102 · Бухарова Т.И.' },
+  { date: '2026-06-13', type: 'exam',    subject: 'Математический анализ',       note: 'Экзамен · 09:00 · ауд. 102 · Бухарова Т.И., Рахматуллин Р.З.' },
+  { date: '2026-06-15', type: 'consult', subject: 'Линейная алгебра',            note: 'Аттестация разделов, консультация · 09:00 · ауд. 102 · Бухарова Т.И.' },
   { date: '2026-06-17', type: 'exam',    subject: 'Линейная алгебра',            note: 'Экзамен · 09:00 · ауд. 102 · Бухарова Т.И., Шарипов А.А.' },
-  { date: '2026-06-20', type: 'consult', subject: 'Общая физика (молек. физика)', note: 'Аттестация разделов, консультация · 09:00 · ауд. 102' },
-  { date: '2026-06-22', type: 'exam',    subject: 'Общая физика (молек. физика)', note: 'Экзамен · 09:00 · ауд. 102 · Загайнов В.А., Хугаев А.В. и др.' },
+  { date: '2026-06-20', type: 'consult', subject: 'Общая физика (молек. физика)', note: 'Аттестация разделов, консультация · 09:00 · ауд. 102 · Загайнов В.А.' },
+  { date: '2026-06-22', type: 'exam',    subject: 'Общая физика (молек. физика)', note: 'Экзамен · 09:00 · ауд. 102 · Загайнов В.А., Хугаев А.А.' },
   { date: '2026-06-24', type: 'consult', subject: 'Химия',                       note: 'Аттестация разделов, консультация · 09:00 · ауд. 102' },
   { date: '2026-06-26', type: 'exam',    subject: 'Химия',                       note: 'Экзамен · 09:00 · ауд. 102 · Щербина Н.А., Конюхов В.Ю. и др.' },
   { date: '2026-06-29', type: 'retake',  subject: 'Химия (пересдача)',           note: 'Пересдача · 09:00 · ауд. 102 · Щербина Н.А. и др.' },
 ];
 builtinEvents.forEach(e => { e.builtin = true; e.id = 'b_' + Math.random().toString(36).slice(2); });
 
-// ---- USER EVENTS (localStorage) ----
-function loadUserEvents() {
-  try { return JSON.parse(localStorage.getItem('cal141_events') || '[]'); } catch { return []; }
+// ---- STORAGE FUNCTIONS ----
+function getCloudStorage() {
+  if (tg && tg.CloudStorage) {
+    return tg.CloudStorage;
+  }
+  return null;
 }
-function saveUserEvents(arr) {
-  localStorage.setItem('cal141_events', JSON.stringify(arr));
+
+function loadFromCloudStorage(key) {
+  return new Promise((resolve) => {
+    const storage = getCloudStorage();
+    if (!storage) {
+      console.log('CloudStorage unavailable');
+      resolve(null);
+      return;
+    }
+    
+    storage.getItem(key, (err, value) => {
+      if (err) {
+        console.error('CloudStorage.getItem error:', err);
+        resolve(null);
+      } else {
+        console.log('CloudStorage.getItem success:', value);
+        resolve(value);
+      }
+    });
+  });
 }
-let userEvents = loadUserEvents();
+
+function saveToCloudStorage(key, value) {
+  return new Promise((resolve) => {
+    const storage = getCloudStorage();
+    if (!storage) {
+      console.log('CloudStorage unavailable');
+      resolve(false);
+      return;
+    }
+    
+    storage.setItem(key, value, (err) => {
+      if (err) {
+        console.error('CloudStorage.setItem error:', err);
+        resolve(false);
+      } else {
+        console.log('CloudStorage.setItem success');
+        resolve(true);
+      }
+    });
+  });
+}
+
+// ---- USER EVENTS (LOAD & SAVE) ----
+async function loadUserEvents() {
+  console.log('Loading events...');
+  
+  // Приоритет 1: Telegram Cloud Storage
+  const cloudData = await loadFromCloudStorage('cal141_events');
+  if (cloudData) {
+    try {
+      const parsed = JSON.parse(cloudData);
+      console.log('Loaded from Telegram Cloud Storage:', parsed.length, 'events');
+      return parsed;
+    } catch (e) {
+      console.error('Error parsing cloud data:', e);
+    }
+  }
+  
+  // Приоритет 2: localStorage
+  try {
+    const localData = localStorage.getItem('cal141_events');
+    if (localData) {
+      const parsed = JSON.parse(localData);
+      console.log('Loaded from localStorage:', parsed.length, 'events');
+      // Загрузили из локального хранилища - синхронизируем с облаком
+      if (getCloudStorage()) {
+        await saveToCloudStorage('cal141_events', localData);
+      }
+      return parsed;
+    }
+  } catch (e) {
+    console.error('Error reading localStorage:', e);
+  }
+  
+  console.log('No saved events found');
+  return [];
+}
+
+async function saveUserEvents(arr) {
+  const jsonStr = JSON.stringify(arr);
+  console.log('Saving events:', arr.length);
+  
+  // Сохраняем в localStorage (всегда)
+  try {
+    localStorage.setItem('cal141_events', jsonStr);
+    console.log('Saved to localStorage');
+  } catch (e) {
+    console.error('localStorage save failed:', e);
+  }
+  
+  // Сохраняем в Telegram Cloud Storage (если доступно)
+  const cloudSuccess = await saveToCloudStorage('cal141_events', jsonStr);
+  if (cloudSuccess) {
+    console.log('Saved to Telegram Cloud Storage');
+  }
+}
+
+let userEvents = [];
+let appReady = false;
+
+// ---- INITIALIZATION ----
+(async () => {
+  console.log('App starting, telegramReady:', telegramReady);
+  userEvents = await loadUserEvents();
+  appReady = true;
+  render();
+  console.log('App initialized with', userEvents.length, 'user events');
+})();
 
 function allEvents() { return [...builtinEvents, ...userEvents]; }
 
@@ -482,7 +597,6 @@ function render() {
 
   // upcoming strip
   const strip = document.getElementById('upcomingStrip');
-  // keep label
   strip.innerHTML = '<div class="strip-label">Ближайшее</div>';
   const upcoming = allEvents()
     .filter(e => e.date >= TODAY)
@@ -618,9 +732,9 @@ function closeModal() {
   currentDate = null;
 }
 
-function deleteEvent(id) {
+async function deleteEvent(id) {
   userEvents = userEvents.filter(e => e.id !== id);
-  saveUserEvents(userEvents);
+  await saveUserEvents(userEvents);
   render();
   openModal(currentDate);
 }
@@ -630,7 +744,7 @@ document.getElementById('modalOverlay').onclick = (e) => {
   if (e.target === document.getElementById('modalOverlay')) closeModal();
 };
 
-document.getElementById('btnAddEvent').onclick = () => {
+document.getElementById('btnAddEvent').onclick = async () => {
   const subject = document.getElementById('newSubject').value.trim();
   if (!subject) { document.getElementById('newSubject').focus(); return; }
   const type = document.getElementById('newType').value;
@@ -644,13 +758,10 @@ document.getElementById('btnAddEvent').onclick = () => {
     builtin: false,
   };
   userEvents.push(newEv);
-  saveUserEvents(userEvents);
+  await saveUserEvents(userEvents);
   render();
   openModal(currentDate);
 };
-
-// initial render
-render();
 </script>
 </body>
 </html>
